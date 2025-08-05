@@ -7,21 +7,36 @@ mkdir -p "$OUTPUT_DIR"
 # List of Pokémon
 POKEMONS=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
 
+# Maximum number of retries
+MAX_RETRIES=3
+
 # Loop through each Pokémon
 for pokemon in "${POKEMONS[@]}"; do
   echo "Fetching data for $pokemon..."
-  
-  # Make API request
-  response=$(curl -s -w "%{http_code}" -o "$OUTPUT_DIR/$pokemon.json" "https://pokeapi.co/api/v2/pokemon/$pokemon")
 
-  # Check if request was successful
-  if [ "$response" -eq 200 ]; then
-    echo "Saved data to $OUTPUT_DIR/$pokemon.json ✅"
-  else
-    echo "[$(date)] Error: Failed to fetch data for $pokemon (status code $response)" >> errors.txt
-    rm -f "$OUTPUT_DIR/$pokemon.json"  # Remove incomplete file
+  success=false
+  attempt=1
+
+  while [ $attempt -le $MAX_RETRIES ]; do
+    # Make API request
+    response=$(curl -s -w "%{http_code}" -o "$OUTPUT_DIR/$pokemon.json" "https://pokeapi.co/api/v2/pokemon/$pokemon")
+
+    if [ "$response" -eq 200 ]; then
+      echo "Saved data to $OUTPUT_DIR/$pokemon.json ✅"
+      success=true
+      break
+    else
+      echo "Attempt $attempt failed for $pokemon (status code $response). Retrying..."
+      ((attempt++))
+      sleep 2
+    fi
+  done
+
+  if [ "$success" = false ]; then
+    echo "[$(date)] Error: Failed to fetch data for $pokemon after $MAX_RETRIES attempts" >> errors.txt
+    rm -f "$OUTPUT_DIR/$pokemon.json" # Remove incomplete file
   fi
 
-  # Delay to avoid rate-limiting
+  # Delay to avoid rate-limiting between Pokémon
   sleep 2
 done
